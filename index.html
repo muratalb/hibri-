@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Hibrit Tohumculuk - Müşteri Aracı</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #111111;
+      --muted: #666;
+      --line: #e8e8ed;
+      --primary: #007aff;
+      --danger: #ff3b30;
+      --success: #34c759;
+      --radius: 14px;
+      --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.03);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin:0; padding:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+    .app { max-width: 920px; margin: 0 auto; padding: 14px 14px 90px; }
+    .title { font-weight: 700; letter-spacing: -.02em; font-size: 1.2rem; margin: 8px 0 14px; }
+    .tabs {
+      position: sticky; top: 0; z-index: 20; background: rgba(255,255,255,.96); backdrop-filter: blur(10px);
+      display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; padding: 10px 0 12px; border-bottom: 1px solid var(--line);
+    }
+    .tab-btn {
+      border:1px solid var(--line); background:#fff; color:#111; border-radius: 999px; padding:10px 6px; font-size:.9rem; cursor:pointer;
+    }
+    .tab-btn.active { border-color: var(--primary); color:var(--primary); font-weight: 600; }
+    .card { border:1px solid var(--line); border-radius: var(--radius); background:#fff; box-shadow: var(--shadow); padding: 14px; margin: 12px 0; }
+    h2 { font-size: 1.05rem; margin: 4px 0 12px; }
+    h3 { font-size: .96rem; margin: 0 0 8px; }
+    .muted { color: var(--muted); font-size: .9rem; }
+    .row { display:flex; gap:10px; flex-wrap: wrap; }
+    .field { flex:1 1 180px; }
+    label { display:block; margin-bottom:6px; font-size:.85rem; color:#333; }
+    input, select, textarea {
+      width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:12px; font: inherit; background:#fff;
+    }
+    textarea { min-height: 84px; resize: vertical; }
+    .btn { border:1px solid var(--line); background:#fff; border-radius:12px; padding:10px 12px; font: inherit; cursor:pointer; }
+    .btn.primary { background: var(--primary); border-color: var(--primary); color:#fff; }
+    .btn.danger { color: #fff; border-color: var(--danger); background: var(--danger); }
+    .btn.ghost { background:#f8f8fa; }
+    .actions { display:flex; gap:8px; flex-wrap:wrap; }
+    .lot-item { padding: 12px; border:1px solid var(--line); border-radius:12px; margin-bottom:10px; }
+    .lot-meta { font-size:.86rem; color:var(--muted); }
+    .lot-item-head { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+    .pill { border:1px solid var(--line); border-radius:999px; padding:2px 8px; font-size: .75rem; color:#444; }
+    .error { color:var(--danger); font-size:.78rem; margin-top:4px; }
+    .result-box { border:1px dashed #cfd2da; border-radius:12px; padding:10px; background:#fcfcff; }
+    .result-grid { display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
+    .result-grid div { padding:8px; border:1px solid var(--line); border-radius:10px; background:#fff; }
+    .warn { color:#a15a00; font-size:.86rem; }
+    .ok { color:#0b7a2e; font-size:.86rem; }
+    .toast-wrap { position: fixed; left: 0; right:0; bottom: 16px; display:flex; justify-content:center; pointer-events:none; z-index:40; }
+    .toast { background:#111; color:#fff; padding:10px 14px; border-radius:999px; font-size:.88rem; opacity:0; transform:translateY(8px); transition:.25s; }
+    .toast.show { opacity:1; transform:none; }
+    .hidden { display:none !important; }
+    .qr-wrap { display:grid; place-items:center; padding:12px; border:1px dashed var(--line); border-radius:12px; }
+    canvas.chart { width:100%; max-width: 430px; border:1px solid var(--line); border-radius: 8px; background:#fff; }
+
+    @media print {
+      .tabs, .no-print, .toast-wrap { display:none !important; }
+      .app { max-width: none; padding:0; }
+      .card { box-shadow:none; break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="title">Hibrit Tohumculuk • Müşteri Aracı</div>
+
+    <div class="tabs no-print">
+      <button class="tab-btn active" data-tab="lots">Lotlar</button>
+      <button class="tab-btn" data-tab="calc">Ekim Normu</button>
+      <button class="tab-btn" data-tab="io">İçe/Dışa Aktar</button>
+      <button class="tab-btn" data-tab="about">Hakkında</button>
+    </div>
+
+    <section id="view-lots">
+      <div class="card">
+        <h2>Lotlar</h2>
+        <div class="row">
+          <div class="field"><label>Lot Ara (Lot No / Çeşit)</label><input id="lotSearch" placeholder="Örn: HT-2401 veya Konya" /></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 id="lotFormTitle">Yeni Lot Ekle</h3>
+        <form id="lotForm">
+          <div class="row">
+            <div class="field"><label>Lot No *</label><input id="lotNo" required /></div>
+            <div class="field"><label>Ürün / Tür *</label><input id="productType" required placeholder="Buğday, Mısır..." /></div>
+            <div class="field"><label>Çeşit *</label><input id="variety" required /></div>
+          </div>
+          <div class="row">
+            <div class="field"><label>Hasat Yılı *</label><input id="harvestYear" type="number" min="1900" max="2100" required /></div>
+            <div class="field"><label>Torba Ağırlığı (kg)</label><input id="bagWeight" type="number" step="0.01" min="0" value="25" /></div>
+            <div class="field"><label>BTA (g/1000 tane) *</label><input id="tkw" type="number" step="0.01" min="0" required /></div>
+          </div>
+          <div class="row">
+            <div class="field"><label>Çimlenme % *</label><input id="germination" type="number" min="0" max="100" step="0.01" required /></div>
+            <div class="field"><label>Safiyet % *</label><input id="purity" type="number" min="0" max="100" step="0.01" required /></div>
+            <div class="field"><label>Not</label><input id="note" /></div>
+          </div>
+          <div id="lotFormError" class="error"></div>
+          <div class="actions" style="margin-top:10px;">
+            <button class="btn primary" type="submit">Kaydet</button>
+            <button class="btn" type="button" id="lotCancelEdit">İptal</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h3>Kayıtlı Lotlar</h3>
+        <div id="lotList"></div>
+      </div>
+    </section>
+
+    <section id="view-calc" class="hidden">
+      <div class="card">
+        <h2>Ekim Normu Hesapla</h2>
+        <div class="row">
+          <div class="field"><label>Mod</label>
+            <select id="calcMode">
+              <option value="lot">Lot seç</option>
+              <option value="manual">Manuel giriş</option>
+            </select>
+          </div>
+          <div class="field" id="calcLotWrap"><label>Lot seçimi</label><select id="calcLotSelect"></select></div>
+          <div class="field"><label>Alan (dekar)</label><input id="areaDa" type="number" min="0" step="0.01" value="10" /></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Hedef Bitki Sıklığı (adet/m²)</label><input id="targetDensity" type="number" min="0" step="0.01" value="450" /></div>
+          <div class="field"><label>Çimlenme %</label><input id="calcGermination" type="number" min="0" max="100" step="0.01" /></div>
+          <div class="field"><label>Safiyet %</label><input id="calcPurity" type="number" min="0" max="100" step="0.01" /></div>
+          <div class="field"><label>BTA (g/1000 tane)</label><input id="calcTkw" type="number" min="0" step="0.01" /></div>
+          <div class="field"><label>Torba Ağırlığı (kg)</label><input id="calcBagWeight" type="number" min="0" step="0.01" value="25" /></div>
+        </div>
+
+        <div class="row">
+          <div class="field"><label>Sıra arası (cm) (opsiyonel)</label><input id="rowSpacing" type="number" min="0" step="0.1" /></div>
+          <div class="field"><label>Sıra üzeri (cm) (opsiyonel)</label><input id="plantSpacing" type="number" min="0" step="0.1" /></div>
+        </div>
+
+        <div class="card" style="margin:10px 0 0;">
+          <label>Senaryo: Çimlenme % <strong id="scenarioVal"></strong></label>
+          <input id="scenarioSlider" type="range" min="0" max="100" step="0.1" />
+          <div class="muted">Slider, temel çimlenme değerinden -15 ile +5 aralığında çalışır.</div>
+        </div>
+
+        <div class="result-box" style="margin-top:10px;">
+          <div class="result-grid">
+            <div><strong>Önerilen ekim miktarı</strong><br><span id="outKgDa">-</span> kg/da</div>
+            <div><strong>Toplam tohum ihtiyacı</strong><br><span id="outTotalKg">-</span> kg</div>
+            <div><strong>Torba adedi</strong><br><span id="outBagCount">-</span></div>
+            <div><strong>Tahmini çıkan bitki</strong><br><span id="outActualDensity">-</span> adet/m²</div>
+          </div>
+          <div id="densityHint" class="muted" style="margin-top:8px;"></div>
+          <div id="calcWarnings" style="margin-top:6px;"></div>
+        </div>
+
+        <canvas id="scenarioChart" class="chart" width="430" height="220" style="margin-top:10px;"></canvas>
+
+        <div class="muted" style="margin-top:10px;">
+          Formül: seeds_per_m² = hedef_bitki / (çimlenme_oranı × safiyet_oranı).<br>
+          Formül: kg_per_m² = (seeds_per_m² × BTA_g) / 1,000,000 (BTA: g/1000 tane).<br>
+          Formül: kg_per_da = kg_per_m² × 1000.
+        </div>
+      </div>
+    </section>
+
+    <section id="view-io" class="hidden">
+      <div class="card">
+        <h2>İçe / Dışa Aktar</h2>
+        <p class="muted">Tüm lot kayıtlarını JSON olarak dışa aktarabilir veya içe aktarabilirsiniz.</p>
+        <div class="actions no-print">
+          <button class="btn primary" id="exportBtn">JSON Dışa Aktar</button>
+          <button class="btn" id="importBtn">JSON İçe Aktar</button>
+          <input id="importFile" class="hidden" type="file" accept="application/json" />
+          <button class="btn ghost" onclick="window.print()">Yazdır / PDF</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Çakışma Kuralları (Lot No aynıysa)</h3>
+        <ul>
+          <li>Mevcut kaydı koru</li>
+          <li>İçe aktarılanla değiştir</li>
+          <li>İkisini de tut (Lot No sonuna -1, -2 eklenir)</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="view-about" class="hidden">
+      <div class="card">
+        <h2>Hakkında</h2>
+        <p>Bu araç Hibrit Tohumculuk müşterileri için çevrimdışı çalışır. Veriler sadece cihazınızda saklanır (localStorage).</p>
+      </div>
+    </section>
+
+    <section id="view-lot-page" class="hidden">
+      <div class="card">
+        <h2>Lot Sayfası (QR)</h2>
+        <div id="lotPageContent"></div>
+        <div class="qr-wrap"><canvas id="qrCanvas" width="256" height="256"></canvas></div>
+        <div class="actions no-print" style="margin-top:10px;">
+          <button id="copyLinkBtn" class="btn">Linki Kopyala</button>
+          <button id="downloadQrBtn" class="btn">QR'ı İndir (PNG)</button>
+          <button class="btn ghost" onclick="window.print()">Yazdır / PDF</button>
+        </div>
+        <p class="warn" style="margin-top:10px;">Uyarı: Link lot bilgilerini içerir, herkese açık paylaşmayın.</p>
+      </div>
+    </section>
+
+    <div class="toast-wrap"><div id="toast" class="toast"></div></div>
+  </div>
+
+  <script>
+    // qrcode-generator 1.4.4 (Kazuhiko Arase) minified embed
+!function(o){function f(a){this.mode=c.MODE_8BIT_BYTE,this.data=a,this.parsedData=[];for(var b=0,d=this.data.length;b<d;b++){var e=[],g=this.data.charCodeAt(b);g>65536?(e[0]=240|g>>>18&7,e[1]=128|g>>>12&63,e[2]=128|g>>>6&63,e[3]=128|63&g):g>2048?(e[0]=224|g>>>12&15,e[1]=128|g>>>6&63,e[2]=128|63&g):g>128?(e[0]=192|g>>>6&31,e[1]=128|63&g):e[0]=g,this.parsedData.push(e)}this.parsedData=Array.prototype.concat.apply([],this.parsedData),this.parsedData.length!=this.data.length&&(this.parsedData.unshift(191),this.parsedData.unshift(187),this.parsedData.unshift(239))}function n(a,b){this.typeNumber=a,this.errorCorrectLevel=b,this.modules=null,this.moduleCount=0,this.dataCache=null,this.dataList=[]}function p(a,b){if(void 0==a.length)throw new Error(a.length+"/"+b);for(var d=0;d<a.length&&0==a[d];)d++;this.num=new Array(a.length-d+b);for(var c=0;c<a.length-d;c++)this.num[c]=a[c+d]}function q(a,b){this.totalCount=a,this.dataCount=b}function h(){this.buffer=[],this.length=0}var c={};c.PAD0=236,c.PAD1=17,c.createData=function(a,b,d){for(var c=q.getRSBlocks(a,b),e=new h,g=0;g<d.length;g++){var f=d[g];e.put(f.mode,4),e.put(f.getLength(),m.getLengthInBits(f.mode,a)),f.write(e)}for(var k=0,g=0;g<c.length;g++)k+=c[g].dataCount;if(e.getLengthInBits()>8*k)throw new Error("code length overflow. ("+e.getLengthInBits()+">"+8*k+")");for(e.getLengthInBits()+4<=8*k&&e.put(0,4);0!=e.getLengthInBits()%8;)e.putBit(!1);for(;;){if(e.getLengthInBits()>=8*k)break;if(e.put(c.PAD0,8),e.getLengthInBits()>=8*k)break;e.put(c.PAD1,8)}return c.createBytes(e,c)},c.createBytes=function(a,b){for(var d=0,c=0,e=0,g=new Array(b.length),f=new Array(b.length),k=0;k<b.length;k++){var r=b[k].dataCount,l=b[k].totalCount-r;c=Math.max(c,r),e=Math.max(e,l),g[k]=new Array(r);for(var p=0;p<g[k].length;p++)g[k][p]=255&a.buffer[p+d];d+=r;var x=m.getErrorCorrectPolynomial(l),u=new p(g[k],x.getLength()-1),v=u.mod(x);f[k]=new Array(x.getLength()-1);for(p=0;p<f[k].length;p++){var w=p+v.getLength()-f[k].length;f[k][p]=w>=0?v.getAt(w):0}}for(var y=0,p=0;p<b.length;p++)y+=b[p].totalCount;for(var z=new Array(y),A=0,p=0;p<c;p++)for(k=0;k<b.length;k++)p<g[k].length&&(z[A++]=g[k][p]);for(p=0;p<e;p++)for(k=0;k<b.length;k++)p<f[k].length&&(z[A++]=f[k][p]);return z};for(var g={PATTERN000:0,PATTERN001:1,PATTERN010:2,PATTERN011:3,PATTERN100:4,PATTERN101:5,PATTERN110:6,PATTERN111:7},r={L:1,M:0,Q:3,H:2},l={MODE_NUMBER:1,MODE_ALPHA_NUM:2,MODE_8BIT_BYTE:4,MODE_KANJI:8},t={G15:1335,G18:7973,G15_MASK:21522},m={getBCHTypeInfo:function(a){for(var b=a<<10;m.getBCHDigit(b)-m.getBCHDigit(t.G15)>=0;)b^=t.G15<<m.getBCHDigit(b)-m.getBCHDigit(t.G15);return(a<<10|b)^t.G15_MASK},getBCHTypeNumber:function(a){for(var b=a<<12;m.getBCHDigit(b)-m.getBCHDigit(t.G18)>=0;)b^=t.G18<<m.getBCHDigit(b)-m.getBCHDigit(t.G18);return a<<12|b},getBCHDigit:function(a){for(var b=0;0!=a;)b++,a>>>=1;return b},getPatternPosition:function(a){return s[a-1]},getMask:function(a,b,d){switch(a){case g.PATTERN000:return(b+d)%2==0;case g.PATTERN001:return b%2==0;case g.PATTERN010:return d%3==0;case g.PATTERN011:return(b+d)%3==0;case g.PATTERN100:return(Math.floor(b/2)+Math.floor(d/3))%2==0;case g.PATTERN101:return b*d%2+b*d%3==0;case g.PATTERN110:return(b*d%2+b*d%3)%2==0;case g.PATTERN111:return(b*d%3+(b+d)%2)%2==0;default:throw new Error("bad maskPattern:"+a)}},getErrorCorrectPolynomial:function(a){for(var b=new p([1],0),d=0;d<a;d++)b=b.multiply(new p([1,m.gexp(d)],0));return b},getLengthInBits:function(a,b){if(1<=b&&b<10)switch(a){case l.MODE_NUMBER:return 10;case l.MODE_ALPHA_NUM:return 9;case l.MODE_8BIT_BYTE:return 8;case l.MODE_KANJI:return 8;default:throw new Error("mode:"+a)}else if(b<27)switch(a){case l.MODE_NUMBER:return 12;case l.MODE_ALPHA_NUM:return 11;case l.MODE_8BIT_BYTE:return 16;case l.MODE_KANJI:return 10;default:throw new Error("mode:"+a)}else{if(!(b<41))throw new Error("type:"+b);switch(a){case l.MODE_NUMBER:return 14;case l.MODE_ALPHA_NUM:return 13;case l.MODE_8BIT_BYTE:return 16;case l.MODE_KANJI:return 12;default:throw new Error("mode:"+a)}}},glog:function(a){if(a<1)throw new Error("glog("+a+")");return e[a]},gexp:function(a){for(;a<0;)a+=255;for(;a>=256;)a-=255;return d[a]}};f.prototype={getLength:function(){return this.parsedData.length},write:function(a){for(var b=0,d=this.parsedData.length;b<d;b++)a.put(this.parsedData[b],8)}},n.prototype={addData:function(a){this.dataList.push(new f(a)),this.dataCache=null},isDark:function(a,b){if(a<0||this.moduleCount<=a||b<0||this.moduleCount<=b)throw new Error(a+","+b);return this.modules[a][b]},getModuleCount:function(){return this.moduleCount},make:function(){if(this.typeNumber<1)for(var a=1;a<40;a++){for(var b=q.getRSBlocks(a,this.errorCorrectLevel),d=new h,c=0;c<this.dataList.length;c++){var e=this.dataList[c];d.put(e.mode,4),d.put(e.getLength(),m.getLengthInBits(e.mode,a)),e.write(d)}var g=0;for(c=0;c<b.length;c++)g+=b[c].dataCount;if(d.getLengthInBits()<=8*g){this.typeNumber=a;break}}this.makeImpl(!1,this.getBestMaskPattern())},makeImpl:function(a,b){this.moduleCount=4*this.typeNumber+17,this.modules=new Array(this.moduleCount);for(var d=0;d<this.moduleCount;d++){this.modules[d]=new Array(this.moduleCount);for(var c=0;c<this.moduleCount;c++)this.modules[d][c]=null}this.setupPositionProbePattern(0,0),this.setupPositionProbePattern(this.moduleCount-7,0),this.setupPositionProbePattern(0,this.moduleCount-7),this.setupPositionAdjustPattern(),this.setupTimingPattern(),this.setupTypeInfo(a,b),this.typeNumber>=7&&this.setupTypeNumber(a),null==this.dataCache&&(this.dataCache=c.createData(this.typeNumber,this.errorCorrectLevel,this.dataList)),this.mapData(this.dataCache,b)},setupPositionProbePattern:function(a,b){for(var d=-1;d<=7;d++)if(!(a+d<=-1||this.moduleCount<=a+d))for(var c=-1;c<=7;c++)b+c<=-1||this.moduleCount<=b+c||(this.modules[a+d][b+c]=0<=d&&d<=6&&(0==c||6==c)||0<=c&&c<=6&&(0==d||6==d)||2<=d&&d<=4&&2<=c&&c<=4)},getBestMaskPattern:function(){for(var a=0,b=0,d=0;d<8;d++){this.makeImpl(!0,d);var c=u.getLostPoint(this);(0==d||a>c)&&(a=c,b=d)}return b},setupTimingPattern:function(){for(var a=8;a<this.moduleCount-8;a++)null==this.modules[a][6]&&(this.modules[a][6]=a%2==0),null==this.modules[6][a]&&(this.modules[6][a]=a%2==0)},setupPositionAdjustPattern:function(){for(var a=m.getPatternPosition(this.typeNumber),b=0;b<a.length;b++)for(var d=0;d<a.length;d++){var c=a[b],e=a[d];if(null==this.modules[c][e])for(var g=-2;g<=2;g++)for(var f=-2;f<=2;f++)this.modules[c+g][e+f]=-2==g||2==g||-2==f||2==f||0==g&&0==f}},setupTypeNumber:function(a){for(var b=m.getBCHTypeNumber(this.typeNumber),d=0;d<18;d++){var c=!a&&1==(b>>d&1);this.modules[Math.floor(d/3)][d%3+this.moduleCount-8-3]=c}for(d=0;d<18;d++)c=!a&&1==(b>>d&1),this.modules[d%3+this.moduleCount-8-3][Math.floor(d/3)]=c},setupTypeInfo:function(a,b){for(var d=this.errorCorrectLevel<<3|b,c=m.getBCHTypeInfo(d),e=0;e<15;e++){var g=!a&&1==(c>>e&1);e<6?this.modules[e][8]=g:e<8?this.modules[e+1][8]=g:this.modules[this.moduleCount-15+e][8]=g}for(e=0;e<15;e++)g=!a&&1==(c>>e&1),e<8?this.modules[8][this.moduleCount-e-1]=g:e<9?this.modules[8][15-e-1+1]=g:this.modules[8][15-e-1]=g;this.modules[this.moduleCount-8][8]=!a},mapData:function(a,b){for(var d=-1,c=this.moduleCount-1,e=7,g=0,f=this.moduleCount-1;f>0;f-=2){6==f&&f--;for(;;){for(var k=0;k<2;k++)if(null==this.modules[c][f-k]){var r=!1;g<a.length&&(r=1==(a[g]>>>e&1));m.getMask(b,c,f-k)&&(r=!r),this.modules[c][f-k]=r,e--,-1==e&&(g++,e=7)}if(c+=d,c<0||this.moduleCount<=c){c-=d,d=-d;break}}}}},p.prototype={getAt:function(a){return this.num[a]},getLength:function(){return this.num.length},multiply:function(a){for(var b=new Array(this.getLength()+a.getLength()-1),d=0;d<this.getLength();d++)for(var c=0;c<a.getLength();c++)b[d+c]^=m.gexp(m.glog(this.getAt(d))+m.glog(a.getAt(c)));return new p(b,0)},mod:function(a){if(this.getLength()-a.getLength()<0)return this;for(var b=m.glog(this.getAt(0))-m.glog(a.getAt(0)),d=new Array(this.getLength()),c=0;c<this.getLength();c++)d[c]=this.getAt(c);for(c=0;c<a.getLength();c++)d[c]^=m.gexp(m.glog(a.getAt(c))+b);return(new p(d,0)).mod(a)}},q.RS_BLOCK_TABLE=[
+[1,26,19],[1,26,16],[1,26,13],[1,26,9],[1,44,34],[1,44,28],[1,44,22],[1,44,16],[1,70,55],[1,70,44],[2,35,17],[2,35,13],[1,100,80],[2,50,32],[2,50,24],[4,25,9],[1,134,108],[2,67,43],[2,33,15,2,34,16],[2,33,11,2,34,12],[2,86,68],[4,43,27],[4,43,19],[4,43,15],[2,98,78],[4,49,31],[2,32,14,4,33,15],[4,39,13,1,40,14],[2,121,97],[2,60,38,2,61,39],[4,40,18,2,41,19],[4,40,14,2,41,15],[2,146,116],[3,58,36,2,59,37],[4,36,16,4,37,17],[4,36,12,4,37,13],[2,86,68,2,87,69],[4,69,43,1,70,44],[6,43,19,2,44,20],[6,43,15,2,44,16],[4,101,81],[1,80,50,4,81,51],[4,50,22,4,51,23],[3,36,12,8,37,13],[2,116,92,2,117,93],[6,58,36,2,59,37],[4,46,20,6,47,21],[7,42,14,4,43,15],[4,133,107],[8,59,37,1,60,38],[8,44,20,4,45,21],[12,33,11,4,34,12],[3,145,115,1,146,116],[4,64,40,5,65,41],[11,36,16,5,37,17],[11,36,12,5,37,13],[5,109,87,1,110,88],[5,65,41,5,66,42],[5,54,24,7,55,25],[11,36,12],[5,122,98,1,123,99],[7,73,45,3,74,46],[15,43,19,2,44,20],[3,45,15,13,46,16],[1,135,107,5,136,108],[10,74,46,1,75,47],[1,50,22,15,51,23],[2,42,14,17,43,15],[5,150,120,1,151,121],[9,69,43,4,70,44],[17,50,22,1,51,23],[2,42,14,19,43,15],[3,141,113,4,142,114],[3,70,44,11,71,45],[17,47,21,4,48,22],[9,39,13,16,40,14],[3,135,107,5,136,108],[3,67,41,13,68,42],[15,54,24,5,55,25],[15,43,15,10,44,16],[4,144,116,4,145,117],[17,68,42],[17,50,22,6,51,23],[19,46,16,6,47,17],[2,139,111,7,140,112],[17,74,46],[7,54,24,16,55,25],[34,37,13],[4,151,121,5,152,122],[4,75,47,14,76,48],[11,54,24,14,55,25],[16,45,15,14,46,16],[6,147,117,4,148,118],[6,73,45,14,74,46],[11,54,24,16,55,25],[30,46,16,2,47,17],[8,132,106,4,133,107],[8,75,47,13,76,48],[7,54,24,22,55,25],[22,45,15,13,46,16],[10,142,114,2,143,115],[19,74,46,4,75,47],[28,50,22,6,51,23],[33,46,16,4,47,17],[8,152,122,4,153,123],[22,73,45,3,74,46],[8,53,23,26,54,24],[12,45,15,28,46,16],[3,147,117,10,148,118],[3,73,45,23,74,46],[4,54,24,31,55,25],[11,45,15,31,46,16],[7,146,116,7,147,117],[21,73,45,7,74,46],[1,53,23,37,54,24],[19,45,15,26,46,16],[5,145,115,10,146,116],[19,75,47,10,76,48],[15,54,24,25,55,25],[23,45,15,25,46,16],[13,145,115,3,146,116],[2,74,46,29,75,47],[42,54,24,1,55,25],[23,45,15,28,46,16],[17,145,115],[10,74,46,23,75,47],[10,54,24,35,55,25],[19,45,15,35,46,16],[17,145,115,1,146,116],[14,74,46,21,75,47],[29,54,24,19,55,25],[11,45,15,46,46,16],[13,145,115,6,146,116],[14,74,46,23,75,47],[44,54,24,7,55,25],[59,46,16,1,47,17],[12,151,121,7,152,122],[12,75,47,26,76,48],[39,54,24,14,55,25],[22,45,15,41,46,16],[6,151,121,14,152,122],[6,75,47,34,76,48],[46,54,24,10,55,25],[2,45,15,64,46,16],[17,152,122,4,153,123],[29,74,46,14,75,47],[49,54,24,10,55,25],[24,45,15,46,46,16],[4,152,122,18,153,123],[13,74,46,32,75,47],[48,54,24,14,55,25],[42,45,15,32,46,16],[20,147,117,4,148,118],[40,75,47,7,76,48],[43,54,24,22,55,25],[10,45,15,67,46,16],[19,148,118,6,149,119],[18,75,47,31,76,48],[34,54,24,34,55,25],[20,45,15,61,46,16]
+],q.getRSBlocks=function(a,b){var d=q.getRsBlockTable(a,b);if(void 0==d)throw new Error("bad rs block @ typeNumber:"+a+"/errorCorrectLevel:"+b);for(var c=d.length/3,e=[],g=0;g<c;g++)for(var f=d[3*g],k=d[3*g+1],m=d[3*g+2],r=0;r<f;r++)e.push(new q(k,m));return e},q.getRsBlockTable=function(a,b){switch(b){case r.L:return q.RS_BLOCK_TABLE[4*(a-1)+0];case r.M:return q.RS_BLOCK_TABLE[4*(a-1)+1];case r.Q:return q.RS_BLOCK_TABLE[4*(a-1)+2];case r.H:return q.RS_BLOCK_TABLE[4*(a-1)+3];default:return void 0}},h.prototype={get:function(a){var b=Math.floor(a/8);return 1==(this.buffer[b]>>>7-a%8&1)},put:function(a,b){for(var d=0;d<b;d++)this.putBit(1==(a>>>b-d-1&1))},getLengthInBits:function(){return this.length},putBit:function(a){var b=Math.floor(this.length/8);this.buffer.length<=b&&this.buffer.push(0),a&&(this.buffer[b]|=128>>>this.length%8),this.length++}};for(var s=[[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50],[6,30,54],[6,32,58],[6,34,62],[6,26,46,66],[6,26,48,70],[6,26,50,74],[6,30,54,78],[6,30,56,82],[6,30,58,86],[6,34,62,90],[6,28,50,72,94],[6,26,50,74,98],[6,30,54,78,102],[6,28,54,80,106],[6,32,58,84,110],[6,30,58,86,114],[6,34,62,90,118],[6,26,50,74,98,122],[6,30,54,78,102,126],[6,26,52,78,104,130],[6,30,56,82,108,134],[6,34,60,86,112,138],[6,30,58,86,114,142],[6,34,62,90,118,146],[6,30,54,78,102,126,150],[6,24,50,76,102,128,154],[6,28,54,80,106,132,158],[6,32,58,84,110,136,162],[6,26,54,82,110,138,166],[6,30,58,86,114,142,170]],d=new Array(256),e=new Array(256),a=0;a<8;a++)d[a]=1<<a;for(a=8;a<256;a++)d[a]=d[a-4]^d[a-5]^d[a-6]^d[a-8];for(a=0;a<255;a++)e[d[a]]=a;var u={getLostPoint:function(a){for(var b=a.getModuleCount(),d=0,c=0;c<b;c++)for(var e=0;e<b;e++){for(var g=0,f=a.isDark(c,e),k=-1;k<=1;k++)if(!(c+k<0||b<=c+k))for(var m=-1;m<=1;m++)e+m<0||b<=e+m||0==k&&0==m||f==a.isDark(c+k,e+m)&&g++;g>5&&(d+=3+g-5)}for(c=0;c<b-1;c++)for(e=0;e<b-1;e++){var r=0;a.isDark(c,e)&&r++,a.isDark(c+1,e)&&r++,a.isDark(c,e+1)&&r++,a.isDark(c+1,e+1)&&r++,0!=r&&4!=r||(d+=3)}for(c=0;c<b;c++)for(e=0;e<b-6;e++)a.isDark(c,e)&&!a.isDark(c,e+1)&&a.isDark(c,e+2)&&a.isDark(c,e+3)&&a.isDark(c,e+4)&&!a.isDark(c,e+5)&&a.isDark(c,e+6)&&(d+=40);for(e=0;e<b;e++)for(c=0;c<b-6;c++)a.isDark(c,e)&&!a.isDark(c+1,e)&&a.isDark(c+2,e)&&a.isDark(c+3,e)&&a.isDark(c+4,e)&&!a.isDark(c+5,e)&&a.isDark(c+6,e)&&(d+=40);for(var l=0,e=0;e<b;e++)for(c=0;c<b;c++)a.isDark(c,e)&&l++;return d+=Math.abs(100*l/b/b-50)/5*10}};o.QRCode=function(a,b){var d=new n(-1,r.H);d.addData(a),d.make();for(var c=d.getModuleCount(),e=b/c,g=Math.floor((b-c*e)/2),f=document.createElement("canvas");f.width=f.height=b;){for(var k=f.getContext("2d"),m=0;m<c;m++)for(var l=0;l<c;l++)k.fillStyle=d.isDark(m,l)?"#000":"#fff",k.fillRect(Math.round(l*e)+g,Math.round(m*e)+g,Math.ceil((l+1)*e)-Math.floor(l*e),Math.ceil((m+1)*e)-Math.floor(m*e));return f}}
+}(window);
+
+    const STORE_KEY = 'hibrit_lotlar_v1';
+    let lots = [];
+    let editingLotNo = null;
+    let currentShareLink = '';
+
+    const el = (id) => document.getElementById(id);
+    const fmt = (n, d=2) => Number.isFinite(n) ? Number(n).toFixed(d) : '-';
+
+    function toast(msg, ms=2200) {
+      const t = el('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), ms);
+    }
+
+    function saveLots(){ localStorage.setItem(STORE_KEY, JSON.stringify(lots)); }
+    function loadLots(){ try{ lots = JSON.parse(localStorage.getItem(STORE_KEY) || '[]'); }catch{ lots=[]; } }
+
+    function validateLot(lot, isEdit=false){
+      if(!lot.lotNo?.trim()) return 'Lot No zorunludur.';
+      if(!lot.productType?.trim()) return 'Ürün/Tür zorunludur.';
+      if(!lot.variety?.trim()) return 'Çeşit zorunludur.';
+      if(!Number.isFinite(lot.harvestYear)) return 'Hasat yılı geçersiz.';
+      if(!Number.isFinite(lot.tkw) || lot.tkw<=0) return 'BTA sıfırdan büyük olmalı.';
+      if(lot.germination<0 || lot.germination>100) return 'Çimlenme 0-100 olmalı.';
+      if(lot.purity<0 || lot.purity>100) return 'Safiyet 0-100 olmalı.';
+      const existing = lots.find(x => x.lotNo === lot.lotNo);
+      if(existing && (!isEdit || lot.lotNo !== editingLotNo)) return 'Bu Lot No zaten kayıtlı.';
+      return '';
+    }
+
+    function resetLotForm(){
+      el('lotForm').reset();
+      el('bagWeight').value = 25;
+      editingLotNo = null;
+      el('lotFormTitle').textContent = 'Yeni Lot Ekle';
+      el('lotFormError').textContent = '';
+    }
+
+    function renderLotList(){
+      const q = el('lotSearch').value.toLowerCase().trim();
+      const box = el('lotList');
+      const filtered = lots.filter(l => !q || l.lotNo.toLowerCase().includes(q) || l.variety.toLowerCase().includes(q));
+      box.innerHTML = filtered.length ? '' : '<div class="muted">Lot bulunamadı.</div>';
+      filtered.forEach(lot => {
+        const div = document.createElement('div');
+        div.className = 'lot-item';
+        div.innerHTML = `
+          <div class="lot-item-head">
+            <div>
+              <strong>${lot.lotNo}</strong> <span class="pill">${lot.productType}</span><br>
+              <span>${lot.variety}</span>
+              <div class="lot-meta">Hasat: ${lot.harvestYear} • Çimlenme: %${fmt(lot.germination,1)} • Safiyet: %${fmt(lot.purity,1)} • BTA: ${fmt(lot.tkw,2)} g</div>
+            </div>
+          </div>
+          <div class="actions" style="margin-top:10px;">
+            <button class="btn" data-action="edit">Düzenle</button>
+            <button class="btn danger" data-action="delete">Sil</button>
+            <button class="btn primary" data-action="qr">Lot Sayfası (QR)</button>
+          </div>`;
+        div.querySelector('[data-action="edit"]').onclick = () => startEditLot(lot.lotNo);
+        div.querySelector('[data-action="delete"]').onclick = () => deleteLot(lot.lotNo);
+        div.querySelector('[data-action="qr"]').onclick = () => openLotPage(lot);
+        box.appendChild(div);
+      });
+      refreshCalcLotSelect();
+    }
+
+    function startEditLot(lotNo){
+      const lot = lots.find(l => l.lotNo === lotNo);
+      if(!lot) return;
+      editingLotNo = lotNo;
+      el('lotFormTitle').textContent = `Lot Düzenle: ${lotNo}`;
+      el('lotNo').value = lot.lotNo;
+      el('productType').value = lot.productType;
+      el('variety').value = lot.variety;
+      el('harvestYear').value = lot.harvestYear;
+      el('bagWeight').value = lot.bagWeight;
+      el('germination').value = lot.germination;
+      el('purity').value = lot.purity;
+      el('tkw').value = lot.tkw;
+      el('note').value = lot.note || '';
+      window.scrollTo({top:0, behavior:'smooth'});
+    }
+
+    function deleteLot(lotNo){
+      if(!confirm(`Lot silinsin mi? (${lotNo})`)) return;
+      lots = lots.filter(l => l.lotNo !== lotNo);
+      saveLots(); renderLotList(); toast('Lot silindi.');
+    }
+
+    function getLotFromForm(){
+      return {
+        lotNo: el('lotNo').value.trim(),
+        productType: el('productType').value.trim(),
+        variety: el('variety').value.trim(),
+        harvestYear: Number(el('harvestYear').value),
+        bagWeight: Number(el('bagWeight').value || 25),
+        germination: Number(el('germination').value),
+        purity: Number(el('purity').value),
+        tkw: Number(el('tkw').value),
+        note: el('note').value.trim()
+      };
+    }
+
+    function refreshCalcLotSelect(){
+      const s = el('calcLotSelect');
+      const cur = s.value;
+      s.innerHTML = lots.map(l => `<option value="${l.lotNo}">${l.lotNo} — ${l.variety}</option>`).join('');
+      if(cur && [...s.options].some(o=>o.value===cur)) s.value = cur;
+      updateCalcInputsFromMode();
+    }
+
+    function updateCalcInputsFromMode(){
+      const mode = el('calcMode').value;
+      const lotWrap = el('calcLotWrap');
+      if(mode === 'lot') {
+        lotWrap.classList.remove('hidden');
+        const lot = lots.find(l=>l.lotNo===el('calcLotSelect').value) || lots[0];
+        if(lot){
+          el('calcGermination').value = lot.germination;
+          el('calcPurity').value = lot.purity;
+          el('calcTkw').value = lot.tkw;
+          el('calcBagWeight').value = lot.bagWeight || 25;
+        }
+      } else {
+        lotWrap.classList.add('hidden');
+      }
+      setupScenarioSlider();
+      updateCalculator();
+    }
+
+    function setupScenarioSlider(){
+      const g = Number(el('calcGermination').value || 0);
+      const slider = el('scenarioSlider');
+      slider.min = Math.max(0, g - 15);
+      slider.max = Math.min(100, g + 5);
+      slider.value = g;
+      el('scenarioVal').textContent = `%${fmt(g,1)}`;
+      drawScenarioChart();
+    }
+
+    function calculateValues({areaDa,target,germ,purity,tkw,bagWeight}){
+      const gRate = germ / 100;
+      const pRate = purity / 100;
+      if(gRate <= 0 || pRate <= 0 || tkw<=0 || target<=0 || areaDa<0) return null;
+      // seeds_per_m2 formula from requirement
+      const seedsPerM2 = target / (gRate * pRate);
+      // kg_per_m2 conversion using TKW (g/1000 seed)
+      const kgPerM2 = (seedsPerM2 * tkw) / 1000000;
+      const kgPerDa = kgPerM2 * 1000;
+      const totalKg = kgPerDa * areaDa;
+      const bagCount = Math.ceil(totalKg / Math.max(0.0001, bagWeight));
+      const estimatedPlants = seedsPerM2 * gRate * pRate;
+      return {kgPerDa,totalKg,bagCount,estimatedPlants};
+    }
+
+    function densityFromSpacings(rowCm, plantCm){
+      if(!rowCm || !plantCm || rowCm<=0 || plantCm<=0) return null;
+      const m2PerPlant = (rowCm/100) * (plantCm/100);
+      return 1 / m2PerPlant;
+    }
+
+    function updateCalculator(){
+      const data = {
+        areaDa: Number(el('areaDa').value),
+        target: Number(el('targetDensity').value),
+        germ: Number(el('scenarioSlider').value || el('calcGermination').value),
+        purity: Number(el('calcPurity').value),
+        tkw: Number(el('calcTkw').value),
+        bagWeight: Number(el('calcBagWeight').value || 25)
+      };
+      el('scenarioVal').textContent = `%${fmt(data.germ,1)}`;
+
+      const out = calculateValues(data);
+      if(!out){
+        el('outKgDa').textContent = el('outTotalKg').textContent = el('outBagCount').textContent = el('outActualDensity').textContent = '-';
+        el('calcWarnings').innerHTML = '<span class="warn">Geçerli değerler giriniz.</span>';
+        return;
+      }
+      el('outKgDa').textContent = fmt(out.kgPerDa,3);
+      el('outTotalKg').textContent = fmt(out.totalKg,2);
+      el('outBagCount').textContent = String(out.bagCount);
+      el('outActualDensity').textContent = fmt(out.estimatedPlants,1);
+
+      const warnings = [];
+      if(out.kgPerDa < 5) warnings.push('Ekim miktarı çok düşük görünüyor.');
+      if(out.kgPerDa > 60) warnings.push('Ekim miktarı çok yüksek görünüyor.');
+      const implied = densityFromSpacings(Number(el('rowSpacing').value), Number(el('plantSpacing').value));
+      if(implied){
+        const diff = Math.abs(implied - data.target) / Math.max(1, data.target);
+        el('densityHint').textContent = `Sıra arası/üzeri ile implied yoğunluk: ${fmt(implied,1)} adet/m²`;
+        if(diff > 0.15) warnings.push('Sıra arası/üzeri yoğunluğu ile hedef yoğunluk arasında fark yüksek.');
+      } else {
+        el('densityHint').textContent = '';
+      }
+      el('calcWarnings').innerHTML = warnings.length ? `<span class="warn">${warnings.join(' ')}</span>` : '<span class="ok">Değerler normal aralıkta.</span>';
+      drawScenarioChart();
+    }
+
+    function drawScenarioChart(){
+      const canvas = el('scenarioChart');
+      const ctx = canvas.getContext('2d');
+      const g = Number(el('calcGermination').value || 0);
+      const p = Number(el('calcPurity').value || 0);
+      const tkw = Number(el('calcTkw').value || 0);
+      const target = Number(el('targetDensity').value || 0);
+      const points = [-15,-10,-5,0,5].map(d=>Math.min(100,Math.max(0,g+d))).map(gg=>({
+        x: gg,
+        y: calculateValues({areaDa:1,target,germ:gg,purity:p,tkw,bagWeight:25})?.kgPerDa || 0
+      }));
+
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle='#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.strokeStyle='#ddd'; ctx.lineWidth=1;
+      ctx.strokeRect(40,20,canvas.width-60,canvas.height-50);
+      const maxY = Math.max(1,...points.map(p=>p.y));
+      ctx.strokeStyle='#007aff'; ctx.lineWidth=2; ctx.beginPath();
+      points.forEach((pt,i)=>{
+        const x = 40 + (i/(points.length-1))*(canvas.width-60);
+        const y = 20 + (1 - pt.y/maxY)*(canvas.height-50);
+        if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      });
+      ctx.stroke();
+      ctx.fillStyle='#007aff';
+      points.forEach((pt,i)=>{
+        const x = 40 + (i/(points.length-1))*(canvas.width-60);
+        const y = 20 + (1 - pt.y/maxY)*(canvas.height-50);
+        ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='#666'; ctx.font='11px sans-serif'; ctx.fillText(`${pt.x.toFixed(0)}%`, x-12, canvas.height-18);
+        ctx.fillStyle='#007aff';
+      });
+    }
+
+    function encodeLotToHash(lot){
+      const payload = btoa(unescape(encodeURIComponent(JSON.stringify(lot))));
+      return `${location.origin}${location.pathname}#lot=${payload}`;
+    }
+
+    function decodeLotFromHash(){
+      const hash = location.hash || '';
+      if(!hash.startsWith('#lot=')) return null;
+      try {
+        const raw = hash.slice(5);
+        return JSON.parse(decodeURIComponent(escape(atob(raw))));
+      } catch { return null; }
+    }
+
+    function openLotPage(lot){
+      showTab('lot-page');
+      const content = el('lotPageContent');
+      currentShareLink = encodeLotToHash(lot);
+      content.innerHTML = `
+        <div class="result-grid">
+          <div><strong>Lot No</strong><br>${lot.lotNo}</div>
+          <div><strong>Ürün / Çeşit</strong><br>${lot.productType} / ${lot.variety}</div>
+          <div><strong>Hasat Yılı</strong><br>${lot.harvestYear}</div>
+          <div><strong>Torba Ağırlığı</strong><br>${fmt(lot.bagWeight,2)} kg</div>
+          <div><strong>Çimlenme</strong><br>%${fmt(lot.germination,1)}</div>
+          <div><strong>Safiyet</strong><br>%${fmt(lot.purity,1)}</div>
+          <div><strong>BTA</strong><br>${fmt(lot.tkw,2)} g</div>
+          <div><strong>Paylaşılabilir Link</strong><br><small style="word-break:break-all">${currentShareLink}</small></div>
+        </div>
+        <div class="card" style="margin-top:10px;">
+          <h3>Mini Ekim Normu (lot ön tanımlı)</h3>
+          <div class="muted">Ana hesap ekranında detaylı senaryo kullanabilirsiniz.</div>
+        </div>
+      `;
+      const qr = new QRCode(currentShareLink, 256);
+      const qrCanvas = el('qrCanvas');
+      const qctx = qrCanvas.getContext('2d');
+      qctx.clearRect(0,0,256,256);
+      qctx.drawImage(qr,0,0,256,256);
+    }
+
+    function showTab(tab){
+      ['lots','calc','io','about','lot-page'].forEach(k => el(`view-${k}`).classList.add('hidden'));
+      el(`view-${tab}`).classList.remove('hidden');
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab===tab));
+    }
+
+    function exportJson(){
+      const blob = new Blob([JSON.stringify({version:1, lots},null,2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `hibrit-lotlar-${new Date().toISOString().slice(0,10)}.json`; a.click();
+      URL.revokeObjectURL(url); toast('JSON dışa aktarıldı.');
+    }
+
+    function uniqueLotNo(base){
+      let i = 1; let candidate = `${base}-${i}`;
+      while(lots.some(l=>l.lotNo===candidate)){ i++; candidate = `${base}-${i}`; }
+      return candidate;
+    }
+
+    function importJson(file){
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(String(reader.result));
+          const incoming = Array.isArray(data) ? data : data.lots;
+          if(!Array.isArray(incoming)) throw new Error('JSON formatı geçersiz.');
+          for(const item of incoming){
+            const lot = {
+              lotNo: String(item.lotNo || '').trim(),
+              productType: String(item.productType || ''),
+              variety: String(item.variety || ''),
+              harvestYear: Number(item.harvestYear),
+              bagWeight: Number(item.bagWeight || 25),
+              germination: Number(item.germination),
+              purity: Number(item.purity),
+              tkw: Number(item.tkw),
+              note: String(item.note || '')
+            };
+            if(!lot.lotNo) continue;
+            const idx = lots.findIndex(l=>l.lotNo===lot.lotNo);
+            if(idx>=0){
+              const choice = prompt(`Çakışma: ${lot.lotNo}\n1: Mevcut kalsın\n2: İçe aktarılanla değiştir\n3: İkisini de tut (-1 ekle)`, '1');
+              if(choice === '2') lots[idx] = lot;
+              else if(choice === '3') { lot.lotNo = uniqueLotNo(lot.lotNo); lots.push(lot); }
+            } else lots.push(lot);
+          }
+          saveLots(); renderLotList(); toast('İçe aktarma tamamlandı.');
+        } catch(e){ alert(e.message || 'İçe aktarma hatası'); }
+      };
+      reader.readAsText(file);
+    }
+
+    function bindEvents(){
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.onclick = () => showTab(btn.dataset.tab));
+      el('lotSearch').addEventListener('input', renderLotList);
+      el('lotCancelEdit').onclick = resetLotForm;
+      el('lotForm').onsubmit = (ev) => {
+        ev.preventDefault();
+        const lot = getLotFromForm();
+        const err = validateLot(lot, !!editingLotNo);
+        el('lotFormError').textContent = err;
+        if(err) return;
+        if(editingLotNo){
+          const idx = lots.findIndex(l=>l.lotNo===editingLotNo);
+          if(idx>=0) lots[idx] = lot;
+          toast('Lot güncellendi.');
+        } else {
+          lots.push(lot);
+          toast('Lot eklendi.');
+        }
+        saveLots(); renderLotList(); resetLotForm();
+      };
+
+      ['calcMode','calcLotSelect','areaDa','targetDensity','calcGermination','calcPurity','calcTkw','calcBagWeight','rowSpacing','plantSpacing']
+        .forEach(id => el(id).addEventListener('input', ()=>{ if(id==='calcGermination') setupScenarioSlider(); updateCalculator(); }));
+      el('scenarioSlider').addEventListener('input', updateCalculator);
+      el('calcMode').addEventListener('change', updateCalcInputsFromMode);
+      el('calcLotSelect').addEventListener('change', updateCalcInputsFromMode);
+
+      el('exportBtn').onclick = exportJson;
+      el('importBtn').onclick = () => el('importFile').click();
+      el('importFile').onchange = (e) => { const f = e.target.files?.[0]; if(f) importJson(f); e.target.value=''; };
+
+      el('copyLinkBtn').onclick = async () => {
+        if(!currentShareLink) return;
+        try { await navigator.clipboard.writeText(currentShareLink); toast('Link kopyalandı.'); }
+        catch { prompt('Kopyalamak için seçip kopyalayın:', currentShareLink); }
+      };
+      el('downloadQrBtn').onclick = () => {
+        const url = el('qrCanvas').toDataURL('image/png');
+        const a = document.createElement('a'); a.href=url; a.download='lot-qr.png'; a.click();
+      };
+    }
+
+    function initFromHashIfAny(){
+      const lot = decodeLotFromHash();
+      if(lot){ openLotPage(lot); toast('Linkten lot sayfası açıldı.'); }
+    }
+
+    loadLots();
+    bindEvents();
+    renderLotList();
+    updateCalcInputsFromMode();
+    initFromHashIfAny();
+  </script>
+</body>
+</html>
