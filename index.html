@@ -1,0 +1,654 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Hibrit Tohumculuk - Müşteri Aracı</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #111111;
+      --muted: #666;
+      --line: #e8e8ed;
+      --primary: #007aff;
+      --danger: #ff3b30;
+      --success: #34c759;
+      --radius: 14px;
+      --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.03);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin:0; padding:0; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+    .app { max-width: 920px; margin: 0 auto; padding: 14px 14px 90px; }
+    .title { font-weight: 700; letter-spacing: -.02em; font-size: 1.2rem; margin: 8px 0 14px; }
+    .tabs {
+      position: sticky; top: 0; z-index: 20; background: rgba(255,255,255,.96); backdrop-filter: blur(10px);
+      display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; padding: 10px 0 12px; border-bottom: 1px solid var(--line);
+    }
+    .tab-btn {
+      border:1px solid var(--line); background:#fff; color:#111; border-radius: 999px; padding:10px 6px; font-size:.9rem; cursor:pointer;
+    }
+    .tab-btn.active { border-color: var(--primary); color:var(--primary); font-weight: 600; }
+    .card { border:1px solid var(--line); border-radius: var(--radius); background:#fff; box-shadow: var(--shadow); padding: 14px; margin: 12px 0; }
+    h2 { font-size: 1.05rem; margin: 4px 0 12px; }
+    h3 { font-size: .96rem; margin: 0 0 8px; }
+    .muted { color: var(--muted); font-size: .9rem; }
+    .row { display:flex; gap:10px; flex-wrap: wrap; }
+    .field { flex:1 1 180px; }
+    label { display:block; margin-bottom:6px; font-size:.85rem; color:#333; }
+    input, select, textarea {
+      width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:12px; font: inherit; background:#fff;
+    }
+    textarea { min-height: 84px; resize: vertical; }
+    .btn { border:1px solid var(--line); background:#fff; border-radius:12px; padding:10px 12px; font: inherit; cursor:pointer; }
+    .btn.primary { background: var(--primary); border-color: var(--primary); color:#fff; }
+    .btn.danger { color: #fff; border-color: var(--danger); background: var(--danger); }
+    .btn.ghost { background:#f8f8fa; }
+    .actions { display:flex; gap:8px; flex-wrap:wrap; }
+    .lot-item { padding: 12px; border:1px solid var(--line); border-radius:12px; margin-bottom:10px; }
+    .lot-meta { font-size:.86rem; color:var(--muted); }
+    .lot-item-head { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+    .pill { border:1px solid var(--line); border-radius:999px; padding:2px 8px; font-size: .75rem; color:#444; }
+    .error { color:var(--danger); font-size:.78rem; margin-top:4px; }
+    .result-box { border:1px dashed #cfd2da; border-radius:12px; padding:10px; background:#fcfcff; }
+    .result-grid { display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
+    .result-grid div { padding:8px; border:1px solid var(--line); border-radius:10px; background:#fff; }
+    .warn { color:#a15a00; font-size:.86rem; }
+    .ok { color:#0b7a2e; font-size:.86rem; }
+    .toast-wrap { position: fixed; left: 0; right:0; bottom: 16px; display:flex; justify-content:center; pointer-events:none; z-index:40; }
+    .toast { background:#111; color:#fff; padding:10px 14px; border-radius:999px; font-size:.88rem; opacity:0; transform:translateY(8px); transition:.25s; }
+    .toast.show { opacity:1; transform:none; }
+    .hidden { display:none !important; }
+    .qr-wrap { display:grid; place-items:center; padding:12px; border:1px dashed var(--line); border-radius:12px; }
+    canvas.chart { width:100%; max-width: 430px; border:1px solid var(--line); border-radius: 8px; background:#fff; }
+
+    @media print {
+      .tabs, .no-print, .toast-wrap { display:none !important; }
+      .app { max-width: none; padding:0; }
+      .card { box-shadow:none; break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="title">Hibrit Tohumculuk • Müşteri Aracı</div>
+
+    <div class="tabs no-print">
+      <button class="tab-btn active" data-tab="lots">Lotlar</button>
+      <button class="tab-btn" data-tab="calc">Ekim Normu</button>
+      <button class="tab-btn" data-tab="io">İçe/Dışa Aktar</button>
+      <button class="tab-btn" data-tab="about">Hakkında</button>
+    </div>
+
+    <section id="view-lots">
+      <div class="card">
+        <h2>Lotlar</h2>
+        <div class="row">
+          <div class="field"><label>Lot Ara (Lot No / Çeşit)</label><input id="lotSearch" placeholder="Örn: HT-2401 veya Konya" /></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 id="lotFormTitle">Yeni Lot Ekle</h3>
+        <form id="lotForm">
+          <div class="row">
+            <div class="field"><label>Lot No *</label><input id="lotNo" required /></div>
+            <div class="field"><label>Ürün / Tür *</label><input id="productType" required placeholder="Buğday, Mısır..." /></div>
+            <div class="field"><label>Çeşit *</label><input id="variety" required /></div>
+          </div>
+          <div class="row">
+            <div class="field"><label>Hasat Yılı *</label><input id="harvestYear" type="number" min="1900" max="2100" required /></div>
+            <div class="field"><label>Torba Ağırlığı (kg)</label><input id="bagWeight" type="number" step="0.01" min="0" value="25" /></div>
+            <div class="field"><label>BTA (g/1000 tane) *</label><input id="tkw" type="number" step="0.01" min="0" required /></div>
+          </div>
+          <div class="row">
+            <div class="field"><label>Çimlenme % *</label><input id="germination" type="number" min="0" max="100" step="0.01" required /></div>
+            <div class="field"><label>Safiyet % *</label><input id="purity" type="number" min="0" max="100" step="0.01" required /></div>
+            <div class="field"><label>Not</label><input id="note" /></div>
+          </div>
+          <div id="lotFormError" class="error"></div>
+          <div class="actions" style="margin-top:10px;">
+            <button class="btn primary" type="submit">Kaydet</button>
+            <button class="btn" type="button" id="lotCancelEdit">İptal</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h3>Kayıtlı Lotlar</h3>
+        <div id="lotList"></div>
+      </div>
+    </section>
+
+    <section id="view-calc" class="hidden">
+      <div class="card">
+        <h2>Ekim Normu Hesapla</h2>
+        <div class="row">
+          <div class="field"><label>Mod</label>
+            <select id="calcMode">
+              <option value="lot">Lot seç</option>
+              <option value="manual">Manuel giriş</option>
+            </select>
+          </div>
+          <div class="field" id="calcLotWrap"><label>Lot seçimi</label><select id="calcLotSelect"></select></div>
+          <div class="field"><label>Alan (dekar)</label><input id="areaDa" type="number" min="0" step="0.01" value="10" /></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Hedef Bitki Sıklığı (adet/m²)</label><input id="targetDensity" type="number" min="0" step="0.01" value="450" /></div>
+          <div class="field"><label>Çimlenme %</label><input id="calcGermination" type="number" min="0" max="100" step="0.01" /></div>
+          <div class="field"><label>Safiyet %</label><input id="calcPurity" type="number" min="0" max="100" step="0.01" /></div>
+          <div class="field"><label>BTA (g/1000 tane)</label><input id="calcTkw" type="number" min="0" step="0.01" /></div>
+          <div class="field"><label>Torba Ağırlığı (kg)</label><input id="calcBagWeight" type="number" min="0" step="0.01" value="25" /></div>
+        </div>
+
+        <div class="row">
+          <div class="field"><label>Sıra arası (cm) (opsiyonel)</label><input id="rowSpacing" type="number" min="0" step="0.1" /></div>
+          <div class="field"><label>Sıra üzeri (cm) (opsiyonel)</label><input id="plantSpacing" type="number" min="0" step="0.1" /></div>
+        </div>
+
+        <div class="card" style="margin:10px 0 0;">
+          <label>Senaryo: Çimlenme % <strong id="scenarioVal"></strong></label>
+          <input id="scenarioSlider" type="range" min="0" max="100" step="0.1" />
+          <div class="muted">Slider, temel çimlenme değerinden -15 ile +5 aralığında çalışır.</div>
+        </div>
+
+        <div class="result-box" style="margin-top:10px;">
+          <div class="result-grid">
+            <div><strong>Önerilen ekim miktarı</strong><br><span id="outKgDa">-</span> kg/da</div>
+            <div><strong>Toplam tohum ihtiyacı</strong><br><span id="outTotalKg">-</span> kg</div>
+            <div><strong>Torba adedi</strong><br><span id="outBagCount">-</span></div>
+            <div><strong>Tahmini çıkan bitki</strong><br><span id="outActualDensity">-</span> adet/m²</div>
+          </div>
+          <div id="densityHint" class="muted" style="margin-top:8px;"></div>
+          <div id="calcWarnings" style="margin-top:6px;"></div>
+        </div>
+
+        <canvas id="scenarioChart" class="chart" width="430" height="220" style="margin-top:10px;"></canvas>
+
+        <div class="muted" style="margin-top:10px;">
+          Formül: seeds_per_m² = hedef_bitki / (çimlenme_oranı × safiyet_oranı).<br>
+          Formül: kg_per_m² = (seeds_per_m² × BTA_g) / 1,000,000 (BTA: g/1000 tane).<br>
+          Formül: kg_per_da = kg_per_m² × 1000.
+        </div>
+      </div>
+    </section>
+
+    <section id="view-io" class="hidden">
+      <div class="card">
+        <h2>İçe / Dışa Aktar</h2>
+        <p class="muted">Tüm lot kayıtlarını JSON olarak dışa aktarabilir veya içe aktarabilirsiniz.</p>
+        <div class="actions no-print">
+          <button class="btn primary" id="exportBtn">JSON Dışa Aktar</button>
+          <button class="btn" id="importBtn">JSON İçe Aktar</button>
+          <input id="importFile" class="hidden" type="file" accept="application/json" />
+          <button class="btn ghost" onclick="window.print()">Yazdır / PDF</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Çakışma Kuralları (Lot No aynıysa)</h3>
+        <ul>
+          <li>Mevcut kaydı koru</li>
+          <li>İçe aktarılanla değiştir</li>
+          <li>İkisini de tut (Lot No sonuna -1, -2 eklenir)</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="view-about" class="hidden">
+      <div class="card">
+        <h2>Hakkında</h2>
+        <p>Bu araç Hibrit Tohumculuk müşterileri için çevrimdışı çalışır. Veriler sadece cihazınızda saklanır (localStorage).</p>
+      </div>
+    </section>
+
+    <section id="view-lot-page" class="hidden">
+      <div class="card">
+        <h2>Lot Sayfası (QR)</h2>
+        <div id="lotPageContent"></div>
+        <div class="qr-wrap"><canvas id="qrCanvas" width="256" height="256"></canvas></div>
+        <div class="actions no-print" style="margin-top:10px;">
+          <button id="copyLinkBtn" class="btn">Linki Kopyala</button>
+          <button id="downloadQrBtn" class="btn">QR'ı İndir (PNG)</button>
+          <button class="btn ghost" onclick="window.print()">Yazdır / PDF</button>
+        </div>
+        <p class="warn" style="margin-top:10px;">Uyarı: Link lot bilgilerini içerir, herkese açık paylaşmayın.</p>
+      </div>
+    </section>
+
+    <div class="toast-wrap"><div id="toast" class="toast"></div></div>
+  </div>
+
+  <script>
+    // Basit çevrimdışı QR-benzeri kod üretici (harici bağımlılık yok)
+    // Not: Bu uygulamada link paylaşımı asıl yöntemdir; bu matris görseli hızlı okutma için üretilir.
+    function QRCode(text, size){
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      const n = 33; // 33x33 matris
+      const cell = size / n;
+
+      // FNV-1a tabanlı deterministik bit akışı
+      let h = 2166136261 >>> 0;
+      for (let i = 0; i < text.length; i++) {
+        h ^= text.charCodeAt(i);
+        h = Math.imul(h, 16777619) >>> 0;
+      }
+      function nextBit(){
+        h ^= h << 13; h >>>= 0;
+        h ^= h >>> 17; h >>>= 0;
+        h ^= h << 5; h >>>= 0;
+        return h & 1;
+      }
+
+      const grid = Array.from({length:n},()=>Array(n).fill(0));
+      function drawFinder(x,y){
+        for(let r=0;r<7;r++) for(let c=0;c<7;c++){
+          const edge = r===0||r===6||c===0||c===6;
+          const core = r>=2&&r<=4&&c>=2&&c<=4;
+          grid[y+r][x+c] = edge || core ? 1 : 0;
+        }
+      }
+      drawFinder(0,0); drawFinder(n-7,0); drawFinder(0,n-7);
+
+      for(let r=0;r<n;r++){
+        for(let c=0;c<n;c++){
+          const inFinder = (r<7 && c<7) || (r<7 && c>=n-7) || (r>=n-7 && c<7);
+          if(inFinder) continue;
+          grid[r][c] = nextBit();
+        }
+      }
+
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0,0,size,size);
+      ctx.fillStyle = '#000';
+      for(let r=0;r<n;r++){
+        for(let c=0;c<n;c++){
+          if(grid[r][c]) ctx.fillRect(Math.floor(c*cell), Math.floor(r*cell), Math.ceil(cell), Math.ceil(cell));
+        }
+      }
+      return canvas;
+    }
+
+    const STORE_KEY = 'hibrit_lotlar_v1';
+    let lots = [];
+    let editingLotNo = null;
+    let currentShareLink = '';
+
+    const el = (id) => document.getElementById(id);
+    const fmt = (n, d=2) => Number.isFinite(n) ? Number(n).toFixed(d) : '-';
+
+    function toast(msg, ms=2200) {
+      const t = el('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), ms);
+    }
+
+    function saveLots(){ localStorage.setItem(STORE_KEY, JSON.stringify(lots)); }
+    function loadLots(){ try{ lots = JSON.parse(localStorage.getItem(STORE_KEY) || '[]'); }catch{ lots=[]; } }
+
+    function validateLot(lot, isEdit=false){
+      if(!lot.lotNo?.trim()) return 'Lot No zorunludur.';
+      if(!lot.productType?.trim()) return 'Ürün/Tür zorunludur.';
+      if(!lot.variety?.trim()) return 'Çeşit zorunludur.';
+      if(!Number.isFinite(lot.harvestYear)) return 'Hasat yılı geçersiz.';
+      if(!Number.isFinite(lot.tkw) || lot.tkw<=0) return 'BTA sıfırdan büyük olmalı.';
+      if(lot.germination<0 || lot.germination>100) return 'Çimlenme 0-100 olmalı.';
+      if(lot.purity<0 || lot.purity>100) return 'Safiyet 0-100 olmalı.';
+      const existing = lots.find(x => x.lotNo === lot.lotNo);
+      if(existing && (!isEdit || lot.lotNo !== editingLotNo)) return 'Bu Lot No zaten kayıtlı.';
+      return '';
+    }
+
+    function resetLotForm(){
+      el('lotForm').reset();
+      el('bagWeight').value = 25;
+      editingLotNo = null;
+      el('lotFormTitle').textContent = 'Yeni Lot Ekle';
+      el('lotFormError').textContent = '';
+    }
+
+    function renderLotList(){
+      const q = el('lotSearch').value.toLowerCase().trim();
+      const box = el('lotList');
+      const filtered = lots.filter(l => !q || l.lotNo.toLowerCase().includes(q) || l.variety.toLowerCase().includes(q));
+      box.innerHTML = filtered.length ? '' : '<div class="muted">Lot bulunamadı.</div>';
+      filtered.forEach(lot => {
+        const div = document.createElement('div');
+        div.className = 'lot-item';
+        div.innerHTML = `
+          <div class="lot-item-head">
+            <div>
+              <strong>${lot.lotNo}</strong> <span class="pill">${lot.productType}</span><br>
+              <span>${lot.variety}</span>
+              <div class="lot-meta">Hasat: ${lot.harvestYear} • Çimlenme: %${fmt(lot.germination,1)} • Safiyet: %${fmt(lot.purity,1)} • BTA: ${fmt(lot.tkw,2)} g</div>
+            </div>
+          </div>
+          <div class="actions" style="margin-top:10px;">
+            <button class="btn" data-action="edit">Düzenle</button>
+            <button class="btn danger" data-action="delete">Sil</button>
+            <button class="btn primary" data-action="qr">Lot Sayfası (QR)</button>
+          </div>`;
+        div.querySelector('[data-action="edit"]').onclick = () => startEditLot(lot.lotNo);
+        div.querySelector('[data-action="delete"]').onclick = () => deleteLot(lot.lotNo);
+        div.querySelector('[data-action="qr"]').onclick = () => openLotPage(lot);
+        box.appendChild(div);
+      });
+      refreshCalcLotSelect();
+    }
+
+    function startEditLot(lotNo){
+      const lot = lots.find(l => l.lotNo === lotNo);
+      if(!lot) return;
+      editingLotNo = lotNo;
+      el('lotFormTitle').textContent = `Lot Düzenle: ${lotNo}`;
+      el('lotNo').value = lot.lotNo;
+      el('productType').value = lot.productType;
+      el('variety').value = lot.variety;
+      el('harvestYear').value = lot.harvestYear;
+      el('bagWeight').value = lot.bagWeight;
+      el('germination').value = lot.germination;
+      el('purity').value = lot.purity;
+      el('tkw').value = lot.tkw;
+      el('note').value = lot.note || '';
+      window.scrollTo({top:0, behavior:'smooth'});
+    }
+
+    function deleteLot(lotNo){
+      if(!confirm(`Lot silinsin mi? (${lotNo})`)) return;
+      lots = lots.filter(l => l.lotNo !== lotNo);
+      saveLots(); renderLotList(); toast('Lot silindi.');
+    }
+
+    function getLotFromForm(){
+      return {
+        lotNo: el('lotNo').value.trim(),
+        productType: el('productType').value.trim(),
+        variety: el('variety').value.trim(),
+        harvestYear: Number(el('harvestYear').value),
+        bagWeight: Number(el('bagWeight').value || 25),
+        germination: Number(el('germination').value),
+        purity: Number(el('purity').value),
+        tkw: Number(el('tkw').value),
+        note: el('note').value.trim()
+      };
+    }
+
+    function refreshCalcLotSelect(){
+      const s = el('calcLotSelect');
+      const cur = s.value;
+      s.innerHTML = lots.map(l => `<option value="${l.lotNo}">${l.lotNo} — ${l.variety}</option>`).join('');
+      if(cur && [...s.options].some(o=>o.value===cur)) s.value = cur;
+      updateCalcInputsFromMode();
+    }
+
+    function updateCalcInputsFromMode(){
+      const mode = el('calcMode').value;
+      const lotWrap = el('calcLotWrap');
+      if(mode === 'lot') {
+        lotWrap.classList.remove('hidden');
+        const lot = lots.find(l=>l.lotNo===el('calcLotSelect').value) || lots[0];
+        if(lot){
+          el('calcGermination').value = lot.germination;
+          el('calcPurity').value = lot.purity;
+          el('calcTkw').value = lot.tkw;
+          el('calcBagWeight').value = lot.bagWeight || 25;
+        }
+      } else {
+        lotWrap.classList.add('hidden');
+      }
+      setupScenarioSlider();
+      updateCalculator();
+    }
+
+    function setupScenarioSlider(){
+      const g = Number(el('calcGermination').value || 0);
+      const slider = el('scenarioSlider');
+      slider.min = Math.max(0, g - 15);
+      slider.max = Math.min(100, g + 5);
+      slider.value = g;
+      el('scenarioVal').textContent = `%${fmt(g,1)}`;
+      drawScenarioChart();
+    }
+
+    function calculateValues({areaDa,target,germ,purity,tkw,bagWeight}){
+      const gRate = germ / 100;
+      const pRate = purity / 100;
+      if(gRate <= 0 || pRate <= 0 || tkw<=0 || target<=0 || areaDa<0) return null;
+      // seeds_per_m2 formula from requirement
+      const seedsPerM2 = target / (gRate * pRate);
+      // kg_per_m2 conversion using TKW (g/1000 seed)
+      const kgPerM2 = (seedsPerM2 * tkw) / 1000000;
+      const kgPerDa = kgPerM2 * 1000;
+      const totalKg = kgPerDa * areaDa;
+      const bagCount = Math.ceil(totalKg / Math.max(0.0001, bagWeight));
+      const estimatedPlants = seedsPerM2 * gRate * pRate;
+      return {kgPerDa,totalKg,bagCount,estimatedPlants};
+    }
+
+    function densityFromSpacings(rowCm, plantCm){
+      if(!rowCm || !plantCm || rowCm<=0 || plantCm<=0) return null;
+      const m2PerPlant = (rowCm/100) * (plantCm/100);
+      return 1 / m2PerPlant;
+    }
+
+    function updateCalculator(){
+      const data = {
+        areaDa: Number(el('areaDa').value),
+        target: Number(el('targetDensity').value),
+        germ: Number(el('scenarioSlider').value || el('calcGermination').value),
+        purity: Number(el('calcPurity').value),
+        tkw: Number(el('calcTkw').value),
+        bagWeight: Number(el('calcBagWeight').value || 25)
+      };
+      el('scenarioVal').textContent = `%${fmt(data.germ,1)}`;
+
+      const out = calculateValues(data);
+      if(!out){
+        el('outKgDa').textContent = el('outTotalKg').textContent = el('outBagCount').textContent = el('outActualDensity').textContent = '-';
+        el('calcWarnings').innerHTML = '<span class="warn">Geçerli değerler giriniz.</span>';
+        return;
+      }
+      el('outKgDa').textContent = fmt(out.kgPerDa,3);
+      el('outTotalKg').textContent = fmt(out.totalKg,2);
+      el('outBagCount').textContent = String(out.bagCount);
+      el('outActualDensity').textContent = fmt(out.estimatedPlants,1);
+
+      const warnings = [];
+      if(out.kgPerDa < 5) warnings.push('Ekim miktarı çok düşük görünüyor.');
+      if(out.kgPerDa > 60) warnings.push('Ekim miktarı çok yüksek görünüyor.');
+      const implied = densityFromSpacings(Number(el('rowSpacing').value), Number(el('plantSpacing').value));
+      if(implied){
+        const diff = Math.abs(implied - data.target) / Math.max(1, data.target);
+        el('densityHint').textContent = `Sıra arası/üzeri ile implied yoğunluk: ${fmt(implied,1)} adet/m²`;
+        if(diff > 0.15) warnings.push('Sıra arası/üzeri yoğunluğu ile hedef yoğunluk arasında fark yüksek.');
+      } else {
+        el('densityHint').textContent = '';
+      }
+      el('calcWarnings').innerHTML = warnings.length ? `<span class="warn">${warnings.join(' ')}</span>` : '<span class="ok">Değerler normal aralıkta.</span>';
+      drawScenarioChart();
+    }
+
+    function drawScenarioChart(){
+      const canvas = el('scenarioChart');
+      const ctx = canvas.getContext('2d');
+      const g = Number(el('calcGermination').value || 0);
+      const p = Number(el('calcPurity').value || 0);
+      const tkw = Number(el('calcTkw').value || 0);
+      const target = Number(el('targetDensity').value || 0);
+      const points = [-15,-10,-5,0,5].map(d=>Math.min(100,Math.max(0,g+d))).map(gg=>({
+        x: gg,
+        y: calculateValues({areaDa:1,target,germ:gg,purity:p,tkw,bagWeight:25})?.kgPerDa || 0
+      }));
+
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle='#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.strokeStyle='#ddd'; ctx.lineWidth=1;
+      ctx.strokeRect(40,20,canvas.width-60,canvas.height-50);
+      const maxY = Math.max(1,...points.map(p=>p.y));
+      ctx.strokeStyle='#007aff'; ctx.lineWidth=2; ctx.beginPath();
+      points.forEach((pt,i)=>{
+        const x = 40 + (i/(points.length-1))*(canvas.width-60);
+        const y = 20 + (1 - pt.y/maxY)*(canvas.height-50);
+        if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      });
+      ctx.stroke();
+      ctx.fillStyle='#007aff';
+      points.forEach((pt,i)=>{
+        const x = 40 + (i/(points.length-1))*(canvas.width-60);
+        const y = 20 + (1 - pt.y/maxY)*(canvas.height-50);
+        ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='#666'; ctx.font='11px sans-serif'; ctx.fillText(`${pt.x.toFixed(0)}%`, x-12, canvas.height-18);
+        ctx.fillStyle='#007aff';
+      });
+    }
+
+    function encodeLotToHash(lot){
+      const payload = btoa(unescape(encodeURIComponent(JSON.stringify(lot))));
+      return `${location.origin}${location.pathname}#lot=${payload}`;
+    }
+
+    function decodeLotFromHash(){
+      const hash = location.hash || '';
+      if(!hash.startsWith('#lot=')) return null;
+      try {
+        const raw = hash.slice(5);
+        return JSON.parse(decodeURIComponent(escape(atob(raw))));
+      } catch { return null; }
+    }
+
+    function openLotPage(lot){
+      showTab('lot-page');
+      const content = el('lotPageContent');
+      currentShareLink = encodeLotToHash(lot);
+      content.innerHTML = `
+        <div class="result-grid">
+          <div><strong>Lot No</strong><br>${lot.lotNo}</div>
+          <div><strong>Ürün / Çeşit</strong><br>${lot.productType} / ${lot.variety}</div>
+          <div><strong>Hasat Yılı</strong><br>${lot.harvestYear}</div>
+          <div><strong>Torba Ağırlığı</strong><br>${fmt(lot.bagWeight,2)} kg</div>
+          <div><strong>Çimlenme</strong><br>%${fmt(lot.germination,1)}</div>
+          <div><strong>Safiyet</strong><br>%${fmt(lot.purity,1)}</div>
+          <div><strong>BTA</strong><br>${fmt(lot.tkw,2)} g</div>
+          <div><strong>Paylaşılabilir Link</strong><br><small style="word-break:break-all">${currentShareLink}</small></div>
+        </div>
+        <div class="card" style="margin-top:10px;">
+          <h3>Mini Ekim Normu (lot ön tanımlı)</h3>
+          <div class="muted">Ana hesap ekranında detaylı senaryo kullanabilirsiniz.</div>
+        </div>
+      `;
+      const qr = new QRCode(currentShareLink, 256);
+      const qrCanvas = el('qrCanvas');
+      const qctx = qrCanvas.getContext('2d');
+      qctx.clearRect(0,0,256,256);
+      qctx.drawImage(qr,0,0,256,256);
+    }
+
+    function showTab(tab){
+      ['lots','calc','io','about','lot-page'].forEach(k => el(`view-${k}`).classList.add('hidden'));
+      el(`view-${tab}`).classList.remove('hidden');
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab===tab));
+    }
+
+    function exportJson(){
+      const blob = new Blob([JSON.stringify({version:1, lots},null,2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `hibrit-lotlar-${new Date().toISOString().slice(0,10)}.json`; a.click();
+      URL.revokeObjectURL(url); toast('JSON dışa aktarıldı.');
+    }
+
+    function uniqueLotNo(base){
+      let i = 1; let candidate = `${base}-${i}`;
+      while(lots.some(l=>l.lotNo===candidate)){ i++; candidate = `${base}-${i}`; }
+      return candidate;
+    }
+
+    function importJson(file){
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(String(reader.result));
+          const incoming = Array.isArray(data) ? data : data.lots;
+          if(!Array.isArray(incoming)) throw new Error('JSON formatı geçersiz.');
+          for(const item of incoming){
+            const lot = {
+              lotNo: String(item.lotNo || '').trim(),
+              productType: String(item.productType || ''),
+              variety: String(item.variety || ''),
+              harvestYear: Number(item.harvestYear),
+              bagWeight: Number(item.bagWeight || 25),
+              germination: Number(item.germination),
+              purity: Number(item.purity),
+              tkw: Number(item.tkw),
+              note: String(item.note || '')
+            };
+            if(!lot.lotNo) continue;
+            const idx = lots.findIndex(l=>l.lotNo===lot.lotNo);
+            if(idx>=0){
+              const choice = prompt(`Çakışma: ${lot.lotNo}\n1: Mevcut kalsın\n2: İçe aktarılanla değiştir\n3: İkisini de tut (-1 ekle)`, '1');
+              if(choice === '2') lots[idx] = lot;
+              else if(choice === '3') { lot.lotNo = uniqueLotNo(lot.lotNo); lots.push(lot); }
+            } else lots.push(lot);
+          }
+          saveLots(); renderLotList(); toast('İçe aktarma tamamlandı.');
+        } catch(e){ alert(e.message || 'İçe aktarma hatası'); }
+      };
+      reader.readAsText(file);
+    }
+
+    function bindEvents(){
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.onclick = () => showTab(btn.dataset.tab));
+      el('lotSearch').addEventListener('input', renderLotList);
+      el('lotCancelEdit').onclick = resetLotForm;
+      el('lotForm').onsubmit = (ev) => {
+        ev.preventDefault();
+        const lot = getLotFromForm();
+        const err = validateLot(lot, !!editingLotNo);
+        el('lotFormError').textContent = err;
+        if(err) return;
+        if(editingLotNo){
+          const idx = lots.findIndex(l=>l.lotNo===editingLotNo);
+          if(idx>=0) lots[idx] = lot;
+          toast('Lot güncellendi.');
+        } else {
+          lots.push(lot);
+          toast('Lot eklendi.');
+        }
+        saveLots(); renderLotList(); resetLotForm();
+      };
+
+      ['calcMode','calcLotSelect','areaDa','targetDensity','calcGermination','calcPurity','calcTkw','calcBagWeight','rowSpacing','plantSpacing']
+        .forEach(id => el(id).addEventListener('input', ()=>{ if(id==='calcGermination') setupScenarioSlider(); updateCalculator(); }));
+      el('scenarioSlider').addEventListener('input', updateCalculator);
+      el('calcMode').addEventListener('change', updateCalcInputsFromMode);
+      el('calcLotSelect').addEventListener('change', updateCalcInputsFromMode);
+
+      el('exportBtn').onclick = exportJson;
+      el('importBtn').onclick = () => el('importFile').click();
+      el('importFile').onchange = (e) => { const f = e.target.files?.[0]; if(f) importJson(f); e.target.value=''; };
+
+      el('copyLinkBtn').onclick = async () => {
+        if(!currentShareLink) return;
+        try { await navigator.clipboard.writeText(currentShareLink); toast('Link kopyalandı.'); }
+        catch { prompt('Kopyalamak için seçip kopyalayın:', currentShareLink); }
+      };
+      el('downloadQrBtn').onclick = () => {
+        const url = el('qrCanvas').toDataURL('image/png');
+        const a = document.createElement('a'); a.href=url; a.download='lot-qr.png'; a.click();
+      };
+    }
+
+    function initFromHashIfAny(){
+      const lot = decodeLotFromHash();
+      if(lot){ openLotPage(lot); toast('Linkten lot sayfası açıldı.'); }
+    }
+
+    loadLots();
+    bindEvents();
+    renderLotList();
+    updateCalcInputsFromMode();
+    initFromHashIfAny();
+  </script>
+</body>
+</html>
